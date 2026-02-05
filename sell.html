@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>禮包代儲精算與廣告生成系統</title>
+    <style>
+        :root { --primary: #1a73e8; --accent: #34a853; --profit: #d93025; --ad: #e91e63; --bg: #f4f7f6; }
+        body { font-family: -apple-system, "Segoe UI", sans-serif; max-width: 1250px; margin: 20px auto; padding: 20px; background: var(--bg); color: #333; line-height: 1.5; }
+        .card { background: white; border-radius: 12px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        
+        /* 區塊樣式 */
+        .config-section { background: #e8f0fe; padding: 20px; border-radius: 10px; margin-bottom: 25px; border: 1px solid #d2e3fc; }
+        .grid-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; align-items: end; }
+        .setup-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-top: 20px; }
+        
+        label { display: block; margin-bottom: 8px; font-weight: bold; font-size: 0.85em; color: #555; }
+        input, textarea, select { width: 100%; padding: 10px; border: 1px solid #dadce0; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+        textarea { height: 150px; font-family: monospace; border: 2px solid var(--primary); background: #fafafa; }
+
+        /* 按鈕樣式 */
+        .btn-group { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; margin-top: 20px; }
+        .btn { border: none; padding: 16px; border-radius: 8px; cursor: pointer; font-size: 1em; font-weight: bold; transition: 0.3s; color: white; }
+        .btn-main { background: var(--primary); }
+        .btn-copy-quote { background: var(--accent); }
+        .btn-copy-ad { background: var(--ad); }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        /* 結果顯示 */
+        h3 { border-left: 5px solid var(--primary); padding-left: 12px; margin-top: 40px; color: #2c3e50; }
+        .preview-box { background: #fffdf0; padding: 20px; border: 1px dashed #fbc02d; border-radius: 8px; white-space: pre-wrap; margin-bottom: 20px; font-size: 1.05em; color: #444; }
+        .ad-preview { background: #fff5f8; border-color: #f06292; }
+        
+        .table-container { overflow-x: auto; margin-top: 15px; border-radius: 8px; border: 1px solid #eee; }
+        table { width: 100%; border-collapse: collapse; background: white; font-size: 0.82em; min-width: 1100px; }
+        th, td { border: 1px solid #eee; padding: 10px 8px; text-align: center; }
+        th { background: #f8f9fa; }
+        .hl-blue { color: var(--primary); font-weight: bold; }
+        .hl-red { color: var(--profit); font-weight: bold; }
+        .hl-green { color: var(--accent); font-weight: bold; }
+        .col-profit { background: #fff5f5; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>💎 禮包代儲精算與廣告生成系統</h2>
+    
+    <div class="config-section">
+        <div style="margin-bottom: 10px; font-weight: bold; color: var(--primary);">
+            <input type="checkbox" id="is_manual" onchange="toggleManual()"> 啟用手動匯率覆蓋
+        </div>
+        <div class="grid-row">
+            <div>
+                <label>美元匯率 (USD/TWD)</label>
+                <input type="number" id="rate_usd" step="0.01" disabled>
+            </div>
+            <div>
+                <label>韓元匯率 (KRW/TWD)</label>
+                <input type="number" id="rate_krw" step="0.0001" disabled>
+            </div>
+            <div id="api-status" style="font-size: 0.8em; color: #666;">🕒 匯率讀取中...</div>
+        </div>
+    </div>
+
+    <div class="setup-grid">
+        <div>
+            <label>點數回饋率 (每1000₩)</label>
+            <input type="number" id="points_rate" value="1.3" step="0.1">
+        </div>
+        <div>
+            <label>支付參數 (除以 X)</label>
+            <input type="number" id="pay_ratio" value="0.985" step="0.001">
+        </div>
+        <div>
+            <label>定價參數 (乘以 X)</label>
+            <input type="number" id="price_ratio" value="1.045" step="0.001">
+        </div>
+        <div>
+            <label>商店溢價修正</label>
+            <input type="number" id="markup" value="1" step="0.01">
+        </div>
+        <div>
+            <label>顯示精度</label>
+            <select id="decimal">
+                <option value="0">整數</option>
+                <option value="2" selected>保留兩位</option>
+            </select>
+        </div>
+    </div>
+
+    <div style="margin-top: 25px;">
+        <label>批量輸入禮包資料 (格式：台幣原價 標價USD)</label>
+        <textarea id="bulk_input">790 
+1390 
+2690 
+3290 </textarea>
+    </div>
+    
+    <div class="btn-group">
+        <button class="btn btn-main" onclick="calculateAll()">1. 執行完整精算</button>
+        <button class="btn btn-copy-quote" onclick="copyText('quote-output')">2. 複製詢問報價</button>
+        <button class="btn btn-copy-ad" onclick="copyText('ad-output')">3. 複製廣告文案</button>
+    </div>
+
+    <div id="results" style="display:none;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div>
+                <h3>✉️ 詢問報價預覽</h3>
+                <div id="quote-output" class="preview-box"></div>
+            </div>
+            <div>
+                <h3>📢 廣告文案預覽</h3>
+                <div id="ad-output" class="preview-box ad-preview"></div>
+            </div>
+        </div>
+
+        <h3>🔍 內部全指標分析 (1~10 項)</h3>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>1.標價(NT)</th>
+                        <th>2.原始折扣</th>
+                        <th>3.支付(NT)</th>
+                        <th>4.支付(KRW)</th>
+                        <th>5.支付折扣</th>
+                        <th>6.預計定價</th>
+                        <th>7.點數</th>
+                        <th>8.回饋金</th>
+                        <th class="col-profit">9.淨利(NT)</th>
+                        <th class="col-profit">10.總利潤%</th>
+                    </tr>
+                </thead>
+                <tbody id="detail-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    let apiRates = { usd: 0, krw: 0 };
+
+    async function fetchRates() {
+        try {
+            const res = await fetch('https://open.er-api.com/v6/latest/USD');
+            const data = await res.json();
+            apiRates.usd = data.rates.TWD;
+            apiRates.krw = data.rates.TWD / data.rates.KRW;
+            updateRateDisplay();
+            document.getElementById('api-status').innerText = "✅ 匯率同步成功";
+        } catch (e) {
+            document.getElementById('api-status').innerText = "❌ 匯率同步失敗";
+        }
+    }
+
+    function updateRateDisplay() {
+        if(!document.getElementById('is_manual').checked) {
+            document.getElementById('rate_usd').value = apiRates.usd.toFixed(2);
+            document.getElementById('rate_krw').value = apiRates.krw.toFixed(5);
+        }
+    }
+
+    function toggleManual() {
+        const manual = document.getElementById('is_manual').checked;
+        document.getElementById('rate_usd').disabled = !manual;
+        document.getElementById('rate_krw').disabled = !manual;
+        if(!manual) updateRateDisplay();
+    }
+
+    function calculateAll() {
+        const uRate = parseFloat(document.getElementById('rate_usd').value);
+        const kRate = parseFloat(document.getElementById('rate_krw').value);
+        const pRate = parseFloat(document.getElementById('points_rate').value);
+        const mUp = parseFloat(document.getElementById('markup').value);
+        const payRatio = parseFloat(document.getElementById('pay_ratio').value) || 0.985;
+        const priceRatio = parseFloat(document.getElementById('price_ratio').value) || 1.045;
+        const dec = parseInt(document.getElementById('decimal').value);
+        
+        const input = document.getElementById('bulk_input').value.trim();
+        if (!input) return;
+
+        const lines = input.split('\n');
+        let priceListText = "";
+        let tableBodyHtml = "";
+
+        lines.forEach((line, i) => {
+            let parts = line.split(/[\s,]+/).filter(x => x).map(p => parseFloat(p));
+            if (parts.length === 0) return;
+
+            let ntdPrice = parts.length >= 2 ? parts[0] : null;
+            let usdTag = parts.length >= 2 ? parts[1] : parts[0];
+
+            // 運算
+            const tagNtd = usdTag * uRate * mUp;
+            const payNtd = tagNtd / payRatio;
+            const payKor = payNtd / kRate;
+            const retailNtd = payNtd * priceRatio;
+            const points = (payKor / 1000) * pRate;
+            const cashback = points / 2;
+            const netProfit = retailNtd - payNtd + cashback;
+            const profitMargin = (netProfit / payNtd) * 100;
+
+            priceListText += `${ntdPrice || '--'}>${Math.round(retailNtd)}\n`;
+
+            tableBodyHtml += `<tr>
+                <td>${i+1}</td>
+                <td>${tagNtd.toFixed(dec)}</td>
+                <td>${ntdPrice ? (tagNtd/ntdPrice).toFixed(3) : '--'}</td>
+                <td class="hl-blue">${payNtd.toFixed(dec)}</td>
+                <td>${Math.round(payKor).toLocaleString()} ₩</td>
+                <td>${ntdPrice ? (payNtd/ntdPrice).toFixed(3) : '--'}</td>
+                <td class="hl-red">${retailNtd.toFixed(dec)}</td>
+                <td>${points.toFixed(1)}</td>
+                <td>${cashback.toFixed(dec)}</td>
+                <td class="hl-green col-profit">${netProfit.toFixed(dec)}</td>
+                <td class="hl-green col-profit">${profitMargin.toFixed(2)}%</td>
+            </tr>`;
+        });
+
+        // 報價單
+        document.getElementById('quote-output').innerText = `您好，謝謝您的詢問！\n目前提供：\n${priceListText}\n若您有興趣下單再麻煩告知需求數量，\n付款方式可以轉帳，謝謝您。`;
+        
+        // 廣告文
+        document.getElementById('ad-output').innerText = `您好，若您最近還需要代儲服務，
+可以找我~
+
+目前提供：
+${priceListText}
+官方Line: @969fpbfe
+https://line.me/R/ti/p/@969fpbfe
+歡迎聯絡交流！謝謝您的參閱🧧`;
+
+        document.getElementById('detail-body').innerHTML = tableBodyHtml;
+        document.getElementById('results').style.display = 'block';
+    }
+
+    function copyText(elementId) {
+        const text = document.getElementById(elementId).innerText;
+        if(!text) return alert("請先執行計算");
+        navigator.clipboard.writeText(text).then(() => alert("✅ 已複製到剪貼簿！"));
+    }
+
+    fetchRates();
+</script>
+
+</body>
+</html>
