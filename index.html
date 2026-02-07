@@ -2,20 +2,21 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>禮包代儲精算與廣告生成系統</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHLager 禮包精算與廣告系統</title>
     <style>
         :root { --primary: #1a73e8; --accent: #34a853; --profit: #d93025; --ad: #e91e63; --bg: #f4f7f6; }
-        body { font-family: -apple-system, "Segoe UI", sans-serif; max-width: 1250px; margin: 20px auto; padding: 20px; background: var(--bg); color: #333; line-height: 1.5; }
+        body { font-family: -apple-system, "Segoe UI", sans-serif; max-width: 1300px; margin: 20px auto; padding: 20px; background: var(--bg); color: #333; line-height: 1.5; }
         .card { background: white; border-radius: 12px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
         
-        /* 區塊樣式 */
+        /* 匯率與參數區 */
         .config-section { background: #e8f0fe; padding: 20px; border-radius: 10px; margin-bottom: 25px; border: 1px solid #d2e3fc; }
         .grid-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; align-items: end; }
-        .setup-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-top: 20px; }
+        .setup-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-top: 20px; }
         
         label { display: block; margin-bottom: 8px; font-weight: bold; font-size: 0.85em; color: #555; }
         input, textarea, select { width: 100%; padding: 10px; border: 1px solid #dadce0; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
-        textarea { height: 150px; font-family: monospace; border: 2px solid var(--primary); background: #fafafa; }
+        textarea { height: 160px; font-family: monospace; border: 2px solid var(--primary); background: #fafafa; }
 
         /* 按鈕樣式 */
         .btn-group { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; margin-top: 20px; }
@@ -25,25 +26,28 @@
         .btn-copy-ad { background: var(--ad); }
         .btn:hover { opacity: 0.9; transform: translateY(-1px); }
 
-        /* 結果顯示 */
+        /* 結果預覽 */
         h3 { border-left: 5px solid var(--primary); padding-left: 12px; margin-top: 40px; color: #2c3e50; }
         .preview-box { background: #fffdf0; padding: 20px; border: 1px dashed #fbc02d; border-radius: 8px; white-space: pre-wrap; margin-bottom: 20px; font-size: 1.05em; color: #444; }
-        .ad-preview { background: #fff5f8; border-color: #f06292; }
         
+        /* 分析表格 */
         .table-container { overflow-x: auto; margin-top: 15px; border-radius: 8px; border: 1px solid #eee; }
         table { width: 100%; border-collapse: collapse; background: white; font-size: 0.82em; min-width: 1100px; }
         th, td { border: 1px solid #eee; padding: 10px 8px; text-align: center; }
-        th { background: #f8f9fa; }
+        th { background: #f8f9fa; color: #666; font-weight: 600; }
+        
         .hl-blue { color: var(--primary); font-weight: bold; }
         .hl-red { color: var(--profit); font-weight: bold; }
         .hl-green { color: var(--accent); font-weight: bold; }
         .col-profit { background: #fff5f5; }
+        
+        .calib-info { background: #fffde7; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-size: 0.9em; border: 1px solid #fbc02d; color: #856404; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>💎 禮包代儲精算與廣告生成系統</h2>
+    <h2>💎 CHLager 禮包報價與利潤精算系統</h2>
     
     <div class="config-section">
         <div style="margin-bottom: 10px; font-weight: bold; color: var(--primary);">
@@ -89,11 +93,12 @@
     </div>
 
     <div style="margin-top: 25px;">
-        <label>批量輸入禮包資料 (格式：台幣原價 標價USD)</label>
-        <textarea id="bulk_input">790 
-1390 
-2690 
-3290 </textarea>
+        <label>批量輸入 (格式：台幣原價 標價USD)</label>
+        <textarea id="bulk_input">270 6.00
+790 18.00
+1390 31.50
+2690 60.00
+3290 75.00</textarea>
     </div>
     
     <div class="btn-group">
@@ -103,6 +108,8 @@
     </div>
 
     <div id="results" style="display:none;">
+        <div id="calib-box" class="calib-info"></div>
+
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
             <div>
                 <h3>✉️ 詢問報價預覽</h3>
@@ -110,11 +117,11 @@
             </div>
             <div>
                 <h3>📢 廣告文案預覽</h3>
-                <div id="ad-output" class="preview-box ad-preview"></div>
+                <div id="ad-output" class="preview-box" style="background:#fff5f8; border-color:#f06292;"></div>
             </div>
         </div>
 
-        <h3>🔍 內部全指標分析 (1~10 項)</h3>
+        <h3>🔍 內部全指標利潤分析 (1~10 項)</h3>
         <div class="table-container">
             <table>
                 <thead>
@@ -127,7 +134,7 @@
                         <th>5.支付折扣</th>
                         <th>6.預計定價</th>
                         <th>7.點數</th>
-                        <th>8.回饋金</th>
+                        <th>8.回饋金(校準)</th>
                         <th class="col-profit">9.淨利(NT)</th>
                         <th class="col-profit">10.總利潤%</th>
                     </tr>
@@ -141,6 +148,7 @@
 <script>
     let apiRates = { usd: 0, krw: 0 };
 
+    // 抓取即時匯率
     async function fetchRates() {
         try {
             const res = await fetch('https://open.er-api.com/v6/latest/USD');
@@ -148,9 +156,9 @@
             apiRates.usd = data.rates.TWD;
             apiRates.krw = data.rates.TWD / data.rates.KRW;
             updateRateDisplay();
-            document.getElementById('api-status').innerText = "✅ 匯率同步成功";
+            document.getElementById('api-status').innerText = "✅ 匯率更新成功";
         } catch (e) {
-            document.getElementById('api-status').innerText = "❌ 匯率同步失敗";
+            document.getElementById('api-status').innerText = "❌ 匯率同步失敗，請手動輸入";
         }
     }
 
@@ -181,6 +189,26 @@
         if (!input) return;
 
         const lines = input.split('\n');
+        let calibUsd = 31.50; // 預設校準基準美金
+        
+        // 自動尋找 1390 對應的美金值進行校準
+        lines.forEach(l => {
+            let p = l.split(/[\s,]+/).map(v => parseFloat(v));
+            if(p[0] === 1390) calibUsd = p[1];
+        });
+
+        // --- 核心校準邏輯 ---
+        // 基準 A: 35000 韓元成本
+        const cost_A_KRW = (35000 * kRate) / payRatio;
+        // 基準 B: 1390級別美金成本
+        const cost_B_USD = (calibUsd * uRate) / payRatio;
+        // 點數價值 = 價差 / 800
+        const pointValue = (cost_B_USD - cost_A_KRW) / 800;
+
+        document.getElementById('calib-box').innerHTML = 
+            `📊 <b>校準資訊：</b> 1390級別(${calibUsd} USD)成本: ${cost_B_USD.toFixed(1)} | 35000₩成本: ${cost_A_KRW.toFixed(1)}<br>` +
+            `每 1 點回饋台幣價值 = <b>${pointValue.toFixed(4)}</b> 元`;
+
         let priceListText = "";
         let tableBodyHtml = "";
 
@@ -188,28 +216,32 @@
             let parts = line.split(/[\s,]+/).filter(x => x).map(p => parseFloat(p));
             if (parts.length === 0) return;
 
-            let ntdPrice = parts.length >= 2 ? parts[0] : null;
+            let ntdOriginal = parts.length >= 2 ? parts[0] : null;
             let usdTag = parts.length >= 2 ? parts[1] : parts[0];
 
-            // 運算
+            // 1~10項運算
             const tagNtd = usdTag * uRate * mUp;
+            const disc1 = ntdOriginal ? (tagNtd / ntdOriginal).toFixed(3) : "--";
             const payNtd = tagNtd / payRatio;
             const payKor = payNtd / kRate;
+            const disc2 = ntdOriginal ? (payNtd / ntdOriginal).toFixed(3) : "--";
             const retailNtd = payNtd * priceRatio;
+            
             const points = (payKor / 1000) * pRate;
-            const cashback = points / 2;
+            const cashback = points * pointValue; // 使用校準後的點數單價
+            
             const netProfit = retailNtd - payNtd + cashback;
             const profitMargin = (netProfit / payNtd) * 100;
 
-            priceListText += `${ntdPrice || '--'}>${Math.round(retailNtd)}\n`;
+            priceListText += `${ntdOriginal || '--'}>${Math.round(retailNtd)}\n`;
 
             tableBodyHtml += `<tr>
                 <td>${i+1}</td>
                 <td>${tagNtd.toFixed(dec)}</td>
-                <td>${ntdPrice ? (tagNtd/ntdPrice).toFixed(3) : '--'}</td>
+                <td>${disc1}</td>
                 <td class="hl-blue">${payNtd.toFixed(dec)}</td>
                 <td>${Math.round(payKor).toLocaleString()} ₩</td>
-                <td>${ntdPrice ? (payNtd/ntdPrice).toFixed(3) : '--'}</td>
+                <td>${disc2}</td>
                 <td class="hl-red">${retailNtd.toFixed(dec)}</td>
                 <td>${points.toFixed(1)}</td>
                 <td>${cashback.toFixed(dec)}</td>
@@ -218,18 +250,10 @@
             </tr>`;
         });
 
-        // 報價單
+        // 生成文案
         document.getElementById('quote-output').innerText = `您好，謝謝您的詢問！\n目前提供：\n${priceListText}\n若您有興趣下單再麻煩告知需求數量，\n付款方式可以轉帳，謝謝您。`;
         
-        // 廣告文
-        document.getElementById('ad-output').innerText = `您好，若您最近還需要代儲服務，
-可以找我~
-
-目前提供：
-${priceListText}
-官方Line: @969fpbfe
-https://line.me/R/ti/p/@969fpbfe
-歡迎聯絡交流！謝謝您的參閱🧧`;
+        document.getElementById('ad-output').innerText = `您好，若您最近還需要代儲服務，\n可以找我~\n\n目前提供：\n${priceListText}\n官方Line: @969fpbfe\nhttps://line.me/R/ti/p/@969fpbfe\n歡迎聯絡交流！謝謝您的參閱🧧`;
 
         document.getElementById('detail-body').innerHTML = tableBodyHtml;
         document.getElementById('results').style.display = 'block';
